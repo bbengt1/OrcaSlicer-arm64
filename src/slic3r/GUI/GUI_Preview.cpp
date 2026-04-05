@@ -10,6 +10,7 @@
 #include "BackgroundSlicingProcess.hpp"
 #include "OpenGLManager.hpp"
 #include "GLCanvas3D.hpp"
+#include "RenderViewHost.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "Plater.hpp"
 #include "MainFrame.hpp"
@@ -37,6 +38,44 @@
 namespace Slic3r {
 namespace GUI {
 
+namespace {
+
+bool use_native_render_host()
+{
+    return wxGetApp().uses_metal_backend();
+}
+
+void sync_compatibility_canvas(wxGLCanvas* canvas_widget, const RenderContext&)
+{
+    if (canvas_widget == nullptr)
+        return;
+
+    wxWindow* parent = canvas_widget->GetParent();
+    if (parent == nullptr)
+        return;
+
+    const wxSize size = parent->GetClientSize();
+    canvas_widget->SetSize(size);
+    canvas_widget->SetMinSize(size);
+}
+
+void configure_native_render_host(RenderViewHost* host, wxGLCanvas* canvas_widget)
+{
+    if (host == nullptr)
+        return;
+
+    host->set_resize_callback([canvas_widget](const RenderContext& context) {
+        sync_compatibility_canvas(canvas_widget, context);
+    });
+    host->set_frame_callback([canvas_widget](const RenderContext&) {
+        if (canvas_widget != nullptr && canvas_widget->IsShown())
+            canvas_widget->Refresh(false);
+    });
+    sync_compatibility_canvas(canvas_widget, host->current_context());
+}
+
+} // namespace
+
 View3D::View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
     : m_canvas_widget(nullptr)
     , m_canvas(nullptr)
@@ -63,11 +102,9 @@ bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig
     m_canvas->set_context(wxGetApp().init_glcontext(*m_canvas_widget));
 
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
-    // XXX: If have OpenGL
     m_canvas->enable_picking(true);
     m_canvas->get_selection().set_mode(Selection::Instance);
     m_canvas->enable_moving(true);
-    // XXX: more config from 3D.pm
     m_canvas->set_model(model);
     m_canvas->set_process(process);
     m_canvas->set_type(GLCanvas3D::ECanvasType::CanvasView3D);
@@ -75,7 +112,6 @@ bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig
     m_canvas->enable_gizmos(true);
     m_canvas->enable_selection(true);
     m_canvas->enable_main_toolbar(true);
-    //BBS: GUI refactor: GLToolbar
     m_canvas->enable_select_plate_toolbar(false);
     m_canvas->enable_assemble_view_toolbar(true);
     m_canvas->enable_separator_toolbar(true);
@@ -83,7 +119,14 @@ bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig
     m_canvas->enable_slope(true);
 
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
-    main_sizer->Add(m_canvas_widget, 1, wxALL | wxEXPAND, 0);
+    if (use_native_render_host()) {
+        m_render_view_host = RenderViewHost::create(this, wxGetApp().get_renderer_backend());
+        configure_native_render_host(m_render_view_host.get(), m_canvas_widget);
+        main_sizer->Add(m_render_view_host.get(), 1, wxALL | wxEXPAND, 0);
+        m_canvas_widget->Hide();
+    } else {
+        main_sizer->Add(m_canvas_widget, 1, wxALL | wxEXPAND, 0);
+    }
 
     SetSizer(main_sizer);
     SetMinSize(GetSize());
@@ -96,6 +139,8 @@ void View3D::set_as_dirty()
 {
     if (m_canvas != nullptr) {
         m_canvas->set_as_dirty();
+    } else if (m_render_view_host != nullptr) {
+        m_render_view_host->request_redraw();
     }
 }
 
@@ -220,6 +265,8 @@ void View3D::render()
     if (m_canvas != nullptr)
         //m_canvas->render();
         m_canvas->set_as_dirty();
+    else if (m_render_view_host != nullptr)
+        m_render_view_host->request_redraw();
 }
 
 Preview::Preview(
@@ -266,17 +313,21 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     m_canvas->set_type(GLCanvas3D::ECanvasType::CanvasPreview);
     m_canvas->enable_legend_texture(true);
     m_canvas->enable_dynamic_background(true);
-    //BBS: GUI refactor: GLToolbar
     if (wxGetApp().is_editor()) {
         m_canvas->enable_select_plate_toolbar(true);
     }
     m_canvas->enable_assemble_view_toolbar(false);
-
-    // sizer, m_canvas_widget
     m_canvas_widget->Bind(wxEVT_KEY_DOWN, &Preview::update_layers_slider_from_canvas, this);
 
     wxBoxSizer *main_sizer = new wxBoxSizer(wxVERTICAL);
-    main_sizer->Add(m_canvas_widget, 1, wxALL | wxEXPAND, 0);
+    if (use_native_render_host()) {
+        m_render_view_host = RenderViewHost::create(this, wxGetApp().get_renderer_backend());
+        configure_native_render_host(m_render_view_host.get(), m_canvas_widget);
+        main_sizer->Add(m_render_view_host.get(), 1, wxALL | wxEXPAND, 0);
+        m_canvas_widget->Hide();
+    } else {
+        main_sizer->Add(m_canvas_widget, 1, wxALL | wxEXPAND, 0);
+    }
 
     SetSizer(main_sizer);
     SetMinSize(GetSize());
@@ -302,6 +353,8 @@ void Preview::set_as_dirty()
 {
     if (m_canvas != nullptr)
         m_canvas->set_as_dirty();
+    else if (m_render_view_host != nullptr)
+        m_render_view_host->request_redraw();
 }
 
 void Preview::bed_shape_changed()
@@ -312,7 +365,8 @@ void Preview::bed_shape_changed()
 
 void Preview::select_view(const std::string& direction)
 {
-    m_canvas->select_view(direction);
+    if (m_canvas != nullptr)
+        m_canvas->select_view(direction);
 }
 
 void Preview::set_drop_target(wxDropTarget* target)
@@ -324,6 +378,12 @@ void Preview::set_drop_target(wxDropTarget* target)
 //BBS: add only gcode mode
 void Preview::load_print(bool keep_z_range, bool only_gcode)
 {
+    if (m_canvas == nullptr) {
+        if (m_render_view_host != nullptr)
+            m_render_view_host->request_redraw();
+        return;
+    }
+
     PrinterTechnology tech = m_process->current_printer_technology();
     if (tech == ptFFF)
         load_print_as_fff(keep_z_range, only_gcode);
@@ -335,6 +395,11 @@ void Preview::load_print(bool keep_z_range, bool only_gcode)
 void Preview::reload_print(bool keep_volumes, bool only_gcode)
 {
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" %1%: enter, keep_volumes %2%")%__LINE__ %keep_volumes;
+    if (m_canvas == nullptr) {
+        if (m_render_view_host != nullptr)
+            m_render_view_host->request_redraw();
+        return;
+    }
 #ifdef __linux__
     // We are getting mysterious crashes on Linux in gtk due to OpenGL context activation GH #1874 #1955.
     // So we are applying a workaround here: a delayed release of OpenGL vertex buffers.
@@ -381,19 +446,22 @@ void Preview::refresh_print()
 //BBS: always load shell at preview
 void Preview::load_shells(const Print& print, bool force_previewing)
 {
-    m_canvas->load_shells(print, force_previewing);
+    if (m_canvas != nullptr)
+        m_canvas->load_shells(print, force_previewing);
 }
 
 //BBS: always load shell at preview
 void Preview::reset_shells()
 {
-    m_canvas->reset_shells();
+    if (m_canvas != nullptr)
+        m_canvas->reset_shells();
 }
 
 void Preview::msw_rescale()
 {
     // rescale warning legend on the canvas
-    get_canvas3d()->msw_rescale();
+    if (get_canvas3d() != nullptr)
+        get_canvas3d()->msw_rescale();
 
     // rescale legend
     refresh_print();
@@ -804,12 +872,9 @@ bool AssembleView::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrint
 
     m_canvas = new GLCanvas3D(m_canvas_widget, bed);
     m_canvas->set_context(wxGetApp().init_glcontext(*m_canvas_widget));
-
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
-    // XXX: If have OpenGL
     m_canvas->enable_picking(true);
     m_canvas->enable_moving(true);
-    // XXX: more config from 3D.pm
     m_canvas->set_model(model);
     m_canvas->set_process(process);
     m_canvas->set_type(GLCanvas3D::ECanvasType::CanvasAssembleView);
@@ -819,17 +884,19 @@ bool AssembleView::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrint
     m_canvas->enable_main_toolbar(false);
     m_canvas->enable_labels(false);
     m_canvas->enable_slope(false);
-    //BBS: GUI refactor: GLToolbar
     m_canvas->enable_assemble_view_toolbar(false);
     m_canvas->enable_return_toolbar(true);
     m_canvas->enable_separator_toolbar(false);
-    //m_canvas->set_show_world_axes(true);//wait for GitHub users to see if they have this requirement
-    // BBS: set volume_selection_mode to Volume
-    //same to 3d //m_canvas->get_selection().set_volume_selection_mode(Selection::Instance);
-    //m_canvas->get_selection().lock_volume_selection_mode();
 
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
-    main_sizer->Add(m_canvas_widget, 1, wxALL | wxEXPAND, 0);
+    if (use_native_render_host()) {
+        m_render_view_host = RenderViewHost::create(this, wxGetApp().get_renderer_backend());
+        configure_native_render_host(m_render_view_host.get(), m_canvas_widget);
+        main_sizer->Add(m_render_view_host.get(), 1, wxALL | wxEXPAND, 0);
+        m_canvas_widget->Hide();
+    } else {
+        main_sizer->Add(m_canvas_widget, 1, wxALL | wxEXPAND, 0);
+    }
 
     SetSizer(main_sizer);
     SetMinSize(GetSize());
@@ -842,12 +909,16 @@ void AssembleView::set_as_dirty()
 {
     if (m_canvas != nullptr)
         m_canvas->set_as_dirty();
+    else if (m_render_view_host != nullptr)
+        m_render_view_host->request_redraw();
 }
 
 void AssembleView::render()
 {
     if (m_canvas != nullptr)
         m_canvas->set_as_dirty();
+    else if (m_render_view_host != nullptr)
+        m_render_view_host->request_redraw();
 }
 
 bool AssembleView::is_reload_delayed() const
@@ -862,6 +933,8 @@ void AssembleView::reload_scene(bool refresh_immediately, bool force_full_scene_
             m_canvas->render(true);
         }
         m_canvas->reload_scene(refresh_immediately, force_full_scene_refresh);
+    } else if (m_render_view_host != nullptr) {
+        m_render_view_host->request_redraw();
     }
 }
 

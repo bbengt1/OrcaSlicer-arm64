@@ -23,6 +23,8 @@ public:
     virtual ~RenderDevice() = default;
 
     virtual const Info& info() const = 0;
+    virtual void* native_device_handle() const = 0;
+    virtual void* native_command_queue_handle() const = 0;
 
     static std::unique_ptr<RenderDevice> create(RendererBackend backend);
 };

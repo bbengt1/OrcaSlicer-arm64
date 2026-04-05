@@ -12,6 +12,7 @@
 #include <string>
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include <slic3r/GUI/GCodeViewer.hpp>
+#include <memory>
 
 class wxGLCanvas;
 class wxBoxSizer;
@@ -32,6 +33,7 @@ namespace GUI {
 class GLCanvas3D;
 class GLToolbar;
 class Bed3D;
+class RenderViewHost;
 struct Camera;
 class Plater;
 #ifdef _WIN32
@@ -42,6 +44,7 @@ class View3D : public wxPanel
 {
     wxGLCanvas* m_canvas_widget;
     GLCanvas3D* m_canvas;
+    std::unique_ptr<RenderViewHost> m_render_view_host;
 
 public:
     View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
@@ -49,6 +52,7 @@ public:
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
     GLCanvas3D* get_canvas3d() { return m_canvas; }
+    RenderViewHost* get_render_view_host() { return m_render_view_host.get(); }
 
     void set_as_dirty();
     void bed_shape_changed();
@@ -88,6 +92,7 @@ class Preview : public wxPanel
 {
     wxGLCanvas* m_canvas_widget { nullptr };
     GLCanvas3D* m_canvas { nullptr };
+    std::unique_ptr<RenderViewHost> m_render_view_host;
     DynamicPrintConfig* m_config;
     BackgroundSlicingProcess* m_process;
     GCodeProcessorResult* m_gcode_result;
@@ -137,6 +142,7 @@ public:
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
     GLCanvas3D* get_canvas3d() { return m_canvas; }
+    RenderViewHost* get_render_view_host() { return m_render_view_host.get(); }
 
     void set_as_dirty();
 
@@ -188,12 +194,14 @@ class AssembleView : public wxPanel
 {
     wxGLCanvas* m_canvas_widget{ nullptr };
     GLCanvas3D* m_canvas{ nullptr };
+    std::unique_ptr<RenderViewHost> m_render_view_host;
 public:
     AssembleView(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
     ~AssembleView();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
     GLCanvas3D* get_canvas3d() { return m_canvas; }
+    RenderViewHost* get_render_view_host() { return m_render_view_host.get(); }
 
     void set_as_dirty();
     void render();

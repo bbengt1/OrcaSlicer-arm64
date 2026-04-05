@@ -12,6 +12,9 @@ struct RenderContext
     int drawable_height { 0 };
     float scale_factor { 1.0f };
     std::uint64_t frame_index { 0 };
+    void* native_command_buffer { nullptr };
+    void* native_render_pass_descriptor { nullptr };
+    void* native_drawable { nullptr };
     bool valid { false };
 };
 

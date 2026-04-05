@@ -115,12 +115,19 @@ set(SLIC3R_GUI_SOURCES
     GUI/GCodeViewer.cpp
     GUI/GCodeViewer.hpp
     GUI/RenderBackend.hpp
+    GUI/RenderBuffer.cpp
+    GUI/RenderBuffer.hpp
     GUI/RenderContext.hpp
     GUI/RenderDevice.cpp
     GUI/RenderDevice.hpp
+    GUI/RenderTexture.cpp
+    GUI/RenderTexture.hpp
     GUI/RenderViewHost.cpp
     GUI/RenderViewHost.hpp
+    GUI/SceneRenderer.cpp
     GUI/SceneRenderer.hpp
+    GUI/ShaderLibrary.cpp
+    GUI/ShaderLibrary.hpp
     GUI/OffscreenRenderer.hpp
     GUI/Gizmos/GizmoObjectManipulation.cpp
     GUI/Gizmos/GizmoObjectManipulation.hpp
@@ -636,6 +643,9 @@ if (APPLE)
         )
     if (SLIC3R_EXPERIMENTAL_METAL)
         list(APPEND SLIC3R_GUI_SOURCES
+                GUI/MetalRenderDevice.mm
+                GUI/MetalSceneRenderer.mm
+                GUI/MetalShaderLibrary.mm
                 GUI/MetalRenderViewHost.hpp
                 GUI/MetalRenderViewHost.mm
             )

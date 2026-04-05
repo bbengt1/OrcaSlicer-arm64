@@ -3725,7 +3725,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 
     // Events:
 
-    if (wxGetApp().is_editor()) {
+    if (wxGetApp().is_editor() && view3D_canvas != nullptr) {
         // Preset change event
         sidebar->Bind(wxEVT_COMBOBOX, &priv::on_combobox_select, this);
         sidebar->Bind(EVT_OBJ_LIST_OBJECT_SELECT, [this](wxEvent&) { priv::selection_changed(); });
@@ -3850,18 +3850,22 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
                 }
             });
     }
-    view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_BED_SHAPE, [q](SimpleEvent&) { q->set_bed_shape(); });
+    if (view3D_canvas != nullptr)
+        view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_BED_SHAPE, [q](SimpleEvent&) { q->set_bed_shape(); });
 
     // Preview events:
-    preview->get_wxglcanvas()->Bind(EVT_GLCANVAS_QUESTION_MARK, [](SimpleEvent&) { wxGetApp().keyboard_shortcuts(); });
-    preview->get_wxglcanvas()->Bind(EVT_GLCANVAS_UPDATE_BED_SHAPE, [q](SimpleEvent&) { q->set_bed_shape(); });
-    preview->get_wxglcanvas()->Bind(EVT_GLCANVAS_UPDATE, [this](SimpleEvent &) {
-            preview->get_canvas3d()->set_as_dirty();
-        });
-    if (wxGetApp().is_editor()) {
-        preview->get_wxglcanvas()->Bind(EVT_GLCANVAS_TAB, [this](SimpleEvent&) { select_next_view_3D(); });
-        preview->get_wxglcanvas()->Bind(EVT_GLCANVAS_COLLAPSE_SIDEBAR, [this](SimpleEvent&) { this->q->collapse_sidebar(!this->q->is_sidebar_collapsed());  });
-        preview->get_wxglcanvas()->Bind(EVT_CUSTOMEVT_TICKSCHANGED, [this](wxCommandEvent& event) {
+    if (preview_canvas != nullptr) {
+        preview_canvas->Bind(EVT_GLCANVAS_QUESTION_MARK, [](SimpleEvent&) { wxGetApp().keyboard_shortcuts(); });
+        preview_canvas->Bind(EVT_GLCANVAS_UPDATE_BED_SHAPE, [q](SimpleEvent&) { q->set_bed_shape(); });
+        preview_canvas->Bind(EVT_GLCANVAS_UPDATE, [this](SimpleEvent &) {
+                if (preview->get_canvas3d() != nullptr)
+                    preview->get_canvas3d()->set_as_dirty();
+            });
+    }
+    if (wxGetApp().is_editor() && preview_canvas != nullptr) {
+        preview_canvas->Bind(EVT_GLCANVAS_TAB, [this](SimpleEvent&) { select_next_view_3D(); });
+        preview_canvas->Bind(EVT_GLCANVAS_COLLAPSE_SIDEBAR, [this](SimpleEvent&) { this->q->collapse_sidebar(!this->q->is_sidebar_collapsed());  });
+        preview_canvas->Bind(EVT_CUSTOMEVT_TICKSCHANGED, [this](wxCommandEvent& event) {
             Type tick_event_type = (Type)event.GetInt();
             Model& model = wxGetApp().plater()->model();
             //BBS: replace model custom gcode with current plate custom gcode
@@ -3888,7 +3892,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 
     //BBS
     wxGLCanvas* assemble_canvas = assemble_view->get_wxglcanvas();
-    if (wxGetApp().is_editor()) {
+    if (wxGetApp().is_editor() && assemble_canvas != nullptr) {
         assemble_canvas->Bind(EVT_GLTOOLBAR_FILLCOLOR, [q](IntEvent& evt) { q->fill_color(evt.get_data()); });
         assemble_canvas->Bind(EVT_GLCANVAS_OBJECT_SELECT, &priv::on_object_select, this);
         assemble_canvas->Bind(EVT_GLVIEWTOOLBAR_3D, [q](SimpleEvent&) { q->select_view_3D("3D"); });

@@ -18,6 +18,7 @@ public:
         : RenderViewHost(parent, backend, "UnsupportedRenderViewHost")
     {
         Bind(wxEVT_PAINT, &UnsupportedRenderViewHost::on_paint, this);
+        Bind(wxEVT_SIZE, &UnsupportedRenderViewHost::on_size, this);
     }
 
     bool is_ready() const override { return false; }
@@ -28,6 +29,12 @@ public:
     }
 
 private:
+    void on_size(wxSizeEvent& event)
+    {
+        notify_resized(current_context());
+        event.Skip();
+    }
+
     void on_paint(wxPaintEvent&)
     {
         wxPaintDC dc(this);
@@ -35,6 +42,7 @@ private:
         dc.Clear();
         dc.SetTextForeground(*wxWHITE);
         dc.DrawText("Experimental renderer unavailable on this build.", wxPoint(12, 12));
+        notify_frame_presented(current_context());
     }
 };
 
@@ -56,6 +64,18 @@ RenderContext RenderViewHost::current_context() const
     context.scale_factor = static_cast<float>(GetContentScaleFactor());
     context.valid = context.drawable_width > 0 && context.drawable_height > 0;
     return context;
+}
+
+void RenderViewHost::notify_frame_presented(const RenderContext& context) const
+{
+    if (m_frame_callback)
+        m_frame_callback(context);
+}
+
+void RenderViewHost::notify_resized(const RenderContext& context) const
+{
+    if (m_resize_callback)
+        m_resize_callback(context);
 }
 
 std::unique_ptr<RenderViewHost> RenderViewHost::create(wxWindow* parent, RendererBackend backend)
