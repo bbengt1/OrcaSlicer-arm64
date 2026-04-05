@@ -116,6 +116,11 @@ else()
     set(SLIC3R_SENTRY_DEFAULT OFF)
 endif()
 option(SLIC3R_SENTRY            "Enable Sentry crash reporting SDK" ${SLIC3R_SENTRY_DEFAULT})
+if (APPLE)
+    option(SLIC3R_EXPERIMENTAL_METAL "Enable experimental Metal renderer scaffolding on macOS" ON)
+else()
+    option(SLIC3R_EXPERIMENTAL_METAL "Enable experimental Metal renderer scaffolding on macOS" OFF)
+endif()
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
 
@@ -556,7 +561,40 @@ find_package(TBB REQUIRED)
 # The Intel TBB library will use the std::exception_ptr feature of C++11.
 # add_definitions(-DTBB_USE_CAPTURED_EXCEPTION=0)
 
-find_package(OpenSSL REQUIRED)
+find_library(SLIC3R_BUNDLED_OPENSSL_SSL
+    NAMES ssl libssl.a
+    PATHS
+        "${CMAKE_PREFIX_PATH}/lib"
+    NO_DEFAULT_PATH
+)
+find_library(SLIC3R_BUNDLED_OPENSSL_CRYPTO
+    NAMES crypto libcrypto.a
+    PATHS
+        "${CMAKE_PREFIX_PATH}/lib"
+    NO_DEFAULT_PATH
+)
+
+if (SLIC3R_BUNDLED_OPENSSL_SSL AND SLIC3R_BUNDLED_OPENSSL_CRYPTO)
+    if (NOT TARGET OpenSSL::SSL)
+        add_library(OpenSSL::SSL STATIC IMPORTED)
+        set_target_properties(OpenSSL::SSL PROPERTIES
+            IMPORTED_LOCATION "${SLIC3R_BUNDLED_OPENSSL_SSL}"
+            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_PREFIX_PATH}/include"
+        )
+    endif ()
+
+    if (NOT TARGET OpenSSL::Crypto)
+        add_library(OpenSSL::Crypto STATIC IMPORTED)
+        set_target_properties(OpenSSL::Crypto PROPERTIES
+            IMPORTED_LOCATION "${SLIC3R_BUNDLED_OPENSSL_CRYPTO}"
+            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_PREFIX_PATH}/include"
+        )
+    endif ()
+
+    set(OPENSSL_FOUND TRUE)
+else ()
+    find_package(OpenSSL REQUIRED)
+endif ()
 find_package(CURL REQUIRED)
 if (SLIC3R_SENTRY)
     find_package(Sentry QUIET)
@@ -566,7 +604,20 @@ if (SLIC3R_SENTRY)
         set(SLIC3R_SENTRY OFF CACHE BOOL "Enable Sentry crash reporting SDK" FORCE)
     endif()
 endif()
-find_package(Freetype REQUIRED)
+find_package(freetype CONFIG QUIET
+    PATHS
+        "${CMAKE_PREFIX_PATH}/lib/cmake/freetype"
+    NO_DEFAULT_PATH
+)
+
+if (TARGET freetype)
+    set(FREETYPE_FOUND TRUE)
+    set(Freetype_FOUND TRUE)
+    set(FREETYPE_LIBRARIES freetype)
+    set(FREETYPE_INCLUDE_DIRS "${CMAKE_PREFIX_PATH}/include/freetype2")
+else ()
+    find_package(Freetype REQUIRED)
+endif ()
 
 
 add_library(libcurl INTERFACE)
@@ -659,7 +710,51 @@ if (NOT EXPAT_FOUND)
     set(EXPAT_LIBRARIES expat)
 endif ()
 
-find_package(PNG REQUIRED)
+find_package(PNG CONFIG QUIET
+    PATHS
+        "${CMAKE_PREFIX_PATH}/lib/libpng"
+    NO_DEFAULT_PATH
+)
+
+if (TARGET png_static)
+    if (NOT TARGET PNG::PNG)
+        add_library(PNG::PNG ALIAS png_static)
+    endif ()
+    set(PNG_FOUND TRUE)
+    set(PNG_LIBRARIES png_static)
+    set(SLIC3R_PNG_LINK_LIBRARY png_static)
+else ()
+    find_package(PNG REQUIRED)
+    set(SLIC3R_PNG_LINK_LIBRARY PNG::PNG)
+endif ()
+
+find_library(SLIC3R_BUNDLED_PNG_ARCHIVE
+    NAMES libpng16.a png16
+    PATHS
+        "${CMAKE_PREFIX_PATH}/lib"
+    NO_DEFAULT_PATH
+)
+
+if (SLIC3R_BUNDLED_PNG_ARCHIVE)
+    set(SLIC3R_PNG_LINK_LIBRARY "${SLIC3R_BUNDLED_PNG_ARCHIVE}")
+    set(PNG_LIBRARIES "${SLIC3R_BUNDLED_PNG_ARCHIVE}")
+endif ()
+
+find_package(libjpeg-turbo CONFIG QUIET
+    PATHS
+        "${CMAKE_PREFIX_PATH}/lib/cmake/libjpeg-turbo"
+    NO_DEFAULT_PATH
+)
+
+if (TARGET libjpeg-turbo::jpeg-static)
+    if (NOT TARGET JPEG::JPEG)
+        add_library(JPEG::JPEG ALIAS libjpeg-turbo::jpeg-static)
+    endif ()
+    set(JPEG_FOUND TRUE)
+    set(JPEG_LIBRARIES libjpeg-turbo::jpeg-static)
+else ()
+    find_package(JPEG REQUIRED)
+endif ()
 
 set(OpenGL_GL_PREFERENCE "LEGACY")
 find_package(OpenGL REQUIRED)

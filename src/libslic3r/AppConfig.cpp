@@ -149,6 +149,8 @@ void AppConfig::set_defaults()
 #ifdef __APPLE__
         if (get("use_retina_opengl").empty())
             set_bool("use_retina_opengl", true);
+        if (get("renderer_backend").empty())
+            set("renderer_backend", "opengl");
 #endif
 
         if (get("single_instance").empty())

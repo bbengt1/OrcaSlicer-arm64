@@ -114,6 +114,14 @@ set(SLIC3R_GUI_SOURCES
     GUI/format.hpp
     GUI/GCodeViewer.cpp
     GUI/GCodeViewer.hpp
+    GUI/RenderBackend.hpp
+    GUI/RenderContext.hpp
+    GUI/RenderDevice.cpp
+    GUI/RenderDevice.hpp
+    GUI/RenderViewHost.cpp
+    GUI/RenderViewHost.hpp
+    GUI/SceneRenderer.hpp
+    GUI/OffscreenRenderer.hpp
     GUI/Gizmos/GizmoObjectManipulation.cpp
     GUI/Gizmos/GizmoObjectManipulation.hpp
     GUI/Gizmos/GLGizmoAssembly.cpp
@@ -626,6 +634,12 @@ if (APPLE)
             GUI/wxMediaCtrl2.mm
             GUI/wxMediaCtrl2.h
         )
+    if (SLIC3R_EXPERIMENTAL_METAL)
+        list(APPEND SLIC3R_GUI_SOURCES
+                GUI/MetalRenderViewHost.hpp
+                GUI/MetalRenderViewHost.mm
+            )
+    endif()
     FIND_LIBRARY(DISKARBITRATION_LIBRARY DiskArbitration)
 else ()
     list(APPEND SLIC3R_GUI_SOURCES
@@ -660,6 +674,10 @@ add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
 target_include_directories(libslic3r_gui PRIVATE Utils ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(libslic3r_gui paho-mqttpp3-static)
 
+if (SLIC3R_EXPERIMENTAL_METAL)
+    target_compile_definitions(libslic3r_gui PRIVATE SLIC3R_EXPERIMENTAL_METAL)
+endif()
+
 target_include_directories(libslic3r_gui PRIVATE ${PAHO_MQTT_CPP_PATH}/include)
 
 target_include_directories(libslic3r_gui PRIVATE ${PAHO_MQTT_C_PATH}/src)
@@ -693,6 +711,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
 elseif (APPLE)
     target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} "-framework Security")
+    if (SLIC3R_EXPERIMENTAL_METAL)
+        target_link_libraries(libslic3r_gui "-framework Metal" "-framework QuartzCore")
+    endif()
 endif()
 
 if (SLIC3R_STATIC)

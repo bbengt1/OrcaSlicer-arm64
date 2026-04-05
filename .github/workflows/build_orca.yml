@@ -118,7 +118,7 @@ jobs:
         if: inputs.os == 'macos-14'
         working-directory: ${{ github.workspace }}
         run: |
-          ./build_release_macos.sh -s -n -x -a universal -t 10.15 -1
+          ./build_release_macos.sh -s -n -x -a universal -t 12.0 -1
 
  # Thanks to RaySajuuk, it's working now
       - name: Sign app and notary
@@ -437,4 +437,3 @@ jobs:
           asset_name: Snapmaker_Orca_profile_validator_Linux${{ env.ubuntu-ver-str }}_nightly
           asset_content_type: application/octet-stream
           max_releases: 1
-

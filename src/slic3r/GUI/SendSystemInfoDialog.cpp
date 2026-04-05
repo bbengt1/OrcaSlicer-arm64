@@ -513,6 +513,7 @@ static std::string generate_system_info_json()
 #endif // _WIN32
 
     pt::ptree opengl_node;
+    opengl_node.put("Backend", wxGetApp().get_renderer_backend_name());
     opengl_node.put("Version", OpenGLManager::get_gl_info().get_version());
     opengl_node.put("GLSLVersion", OpenGLManager::get_gl_info().get_glsl_version());
     opengl_node.put("Vendor", OpenGLManager::get_gl_info().get_vendor());

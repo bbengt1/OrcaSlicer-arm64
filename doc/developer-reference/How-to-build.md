@@ -138,6 +138,13 @@ cmake --version
 
 5. Make sure it reports a **3.31.x** version.
 
+6. For the Apple Silicon Metal fork, use:
+
+```shell
+export SLIC3R_RENDERER_BACKEND=metal
+./build_release_macos.sh -a arm64 -t 12.0
+```
+
 > [!IMPORTANT]
 > If you've recently upgraded Xcode, be sure to open Xcode at least once and install the required macOS build support.
 
@@ -148,11 +155,15 @@ cmake --version
    git clone https://github.com/SoftFever/OrcaSlicer
    cd OrcaSlicer
    ```
-2. Build the application:
+2. For the internal Apple Silicon Metal fork, use the dedicated setup guide:
+   ```shell
+   doc/apple_silicon_metal_port/apple_silicon_build.md
+   ```
+3. Build the application:
    ```shell
    ./build_release_macos.sh
    ```
-3. Open the application:
+4. Open the application:
    ```shell
    open build/arm64/OrcaSlicer/OrcaSlicer.app
    ```

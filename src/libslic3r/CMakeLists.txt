@@ -500,6 +500,9 @@ if (_opts)
 endif()
 
 target_link_libraries(libslic3r_cgal PRIVATE ${_cgal_tgt} eigen admesh libigl mcut boost_libs)
+if (OPENSSL_INCLUDE_DIR)
+    target_include_directories(libslic3r_cgal SYSTEM PRIVATE ${OPENSSL_INCLUDE_DIR})
+endif()
 
 if (MSVC AND "${CMAKE_SIZEOF_VOID_P}" STREQUAL "4") # 32 bit MSVC workaround
     target_compile_definitions(libslic3r_cgal PRIVATE CGAL_DO_NOT_USE_MPZF)
@@ -511,6 +514,9 @@ target_compile_definitions(libslic3r PUBLIC -DUSE_TBB -DTBB_USE_CAPTURED_EXCEPTI
 # Make source directory PUBLIC so other modules (like libslic3r_gui) can include headers like SentryWrapper.hpp
 target_include_directories(libslic3r PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(libslic3r SYSTEM PUBLIC ${EXPAT_INCLUDE_DIRS})
+if (OPENSSL_INCLUDE_DIR)
+    target_include_directories(libslic3r SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})
+endif()
 
 # Find the OCCT and related libraries
 set(OpenCASCADE_DIR "${CMAKE_PREFIX_PATH}/lib/cmake/occt")
@@ -569,7 +575,7 @@ target_link_libraries(libslic3r
         libslic3r_cgal
         mcut
         noise::noise
-        PNG::PNG
+        ${SLIC3R_PNG_LINK_LIBRARY}
         qhull
         qoi
         semver

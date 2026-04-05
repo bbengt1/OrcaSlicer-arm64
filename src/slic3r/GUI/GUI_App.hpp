@@ -6,6 +6,7 @@
 #include "ImGuiWrapper.hpp"
 #include "ConfigWizard.hpp"
 #include "OpenGLManager.hpp"
+#include "RenderBackend.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "slic3r/GUI/DeviceManager.hpp"
@@ -288,6 +289,7 @@ private:
     const wxLanguageInfo		 *m_language_info_best   = nullptr;
 
     OpenGLManager m_opengl_mgr;
+    RendererBackend m_renderer_backend { RendererBackend::OpenGL };
     std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
 
     std::unique_ptr<ImGuiWrapper> m_imgui;
@@ -432,6 +434,9 @@ private:
     static std::string get_gl_info(bool for_github);
     wxGLContext*    init_glcontext(wxGLCanvas& canvas);
     bool            init_opengl();
+    RendererBackend get_renderer_backend() const { return m_renderer_backend; }
+    bool            uses_metal_backend() const { return m_renderer_backend == RendererBackend::Metal; }
+    std::string     get_renderer_backend_name() const { return renderer_backend_display_name(m_renderer_backend); }
 
     void            init_download_path();
 #if wxUSE_WEBVIEW_EDGE

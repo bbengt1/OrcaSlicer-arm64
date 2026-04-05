@@ -177,6 +177,34 @@ namespace pt = boost::property_tree;
 namespace Slic3r {
 namespace GUI {
 
+namespace {
+
+RendererBackend resolve_renderer_backend(const AppConfig* app_config)
+{
+    std::string backend;
+    if (const char* env_backend = std::getenv("SLIC3R_RENDERER_BACKEND"); env_backend != nullptr)
+        backend = boost::to_lower_copy(std::string(env_backend));
+    else if (app_config != nullptr)
+        backend = boost::to_lower_copy(app_config->get("renderer_backend"));
+
+#if defined(__APPLE__) && defined(SLIC3R_EXPERIMENTAL_METAL)
+    if (backend == "metal")
+        return RendererBackend::Metal;
+#endif
+
+    if (backend == "metal") {
+        BOOST_LOG_TRIVIAL(warning)
+            << "Renderer backend 'metal' requested but unsupported in this build. Falling back to OpenGL.";
+    } else if (! backend.empty() && backend != "opengl") {
+        BOOST_LOG_TRIVIAL(warning)
+            << "Unknown renderer backend '" << backend << "' requested. Falling back to OpenGL.";
+    }
+
+    return RendererBackend::OpenGL;
+}
+
+} // namespace
+
 class MainFrame;
 
 void start_ping_test()
@@ -1885,7 +1913,11 @@ GUI_App::~GUI_App()
 // Otherwise HTML formatted for the system info dialog.
 std::string GUI_App::get_gl_info(bool for_github)
 {
-    return OpenGLManager::get_gl_info().to_string(for_github);
+    const std::string backend = wxGetApp().get_renderer_backend_name();
+    std::string info = OpenGLManager::get_gl_info().to_string(for_github);
+    if (for_github)
+        return "Renderer backend: " + backend + "\n" + info;
+    return std::string("<b>Renderer backend:</b> ") + backend + "<br>" + info;
 }
 
 wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
@@ -2058,6 +2090,8 @@ void GUI_App::init_app_config()
 #endif // _WIN32
     }
     set_logging_level(Slic3r::level_string_to_boost(app_config->get("log_severity_level")));
+    m_renderer_backend = resolve_renderer_backend(app_config);
+    BOOST_LOG_TRIVIAL(info) << "Renderer backend selected: " << get_renderer_backend_name();
 
 }
 

@@ -49,7 +49,9 @@ if (SLIC3R_GUI)
 
     include(${wxWidgets_USE_FILE})
 
-    find_package(JPEG QUIET)
+    if (NOT JPEG_FOUND)
+        find_package(JPEG QUIET)
+    endif()
 
     string(REGEX MATCH "wxpng" WX_PNG_BUILTIN ${wxWidgets_LIBRARIES})
     if (PNG_FOUND AND NOT WX_PNG_BUILTIN)
